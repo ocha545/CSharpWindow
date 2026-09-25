@@ -18,8 +18,29 @@ RawInputでキー入力を取得できます
 - Win32 Release .NET Framework
 <br>
 それぞれ以下のように出力されます
-```C#
+Ijwhost.dllがある場合はそちらもリンクして使用してください
+
+```
 x64/
-├── Debug-netcore/<br>
-│    ┣━ CSharpWindow.dll
+├── Debug-netcore/
+│   ├── CSharpWindow.dll
+│   └── Ijwhost.dll
+├── Debug-netframework/
+│   └── CSharpWindow.dll
+├── Release-netcore/
+│   ├── CSharpWindow.dll
+│   └── Ijwhost.dll
+└── Release-netframework/
+    └── CSharpWindow.dll
+Win32/
+├── Debug-netcore/
+│   ├── CSharpWindow.dll
+│   └── Ijwhost.dll
+├── Debug-netframework/
+│   └── CSharpWindow.dll
+├── Release-netcore/
+│   ├── CSharpWindow.dll
+│   └── Ijwhost.dll
+└── Release-netframework/
+    └── CSharpWindow.dll
 ```
