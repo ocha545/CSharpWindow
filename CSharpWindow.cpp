@@ -53,48 +53,99 @@ LRESULT CALLBACK CSW::WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
 	}
 }
 
-CSW::Window::Window(String^ title, int width, int height)
-	: window(NULL), instance(GetModuleHandleW(NULL)),
-	updateFuncs(gcnew List<Action^>(0))
+bool CSW::Window::RegisterWindowClass()
 {
-	::SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-	GlobalKey::Create();
-
 	WNDCLASSEX windowClass{};
 	windowClass.cbSize = sizeof(windowClass);
 	windowClass.style = CS_HREDRAW | CS_VREDRAW;
 	windowClass.hInstance = instance;
 	windowClass.hbrBackground = (HBRUSH)DKGRAY_BRUSH;
 	windowClass.lpfnWndProc = WndProc;
-	windowClass.lpszClassName = L"CSharpWindow ^_^;";
-	RegisterClassEx(&windowClass);
+	windowClass.lpszClassName = CSW_REGISTER_CLASS_NAME;
+	return ::RegisterClassExW(&windowClass) != FALSE;
+}
 
-	RECT windowRect{};
-	windowRect.left = 0;
-	windowRect.top = 0;
-	windowRect.right = width;
-	windowRect.bottom = height;
-	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
-	int windowWidth = windowRect.right - windowRect.left;
-	int windowHeight = windowRect.bottom - windowRect.top;
+bool CSW::Window::UnregisterWindowClass()
+{
+	return ::UnregisterClassW(CSW_REGISTER_CLASS_NAME, instance) != FALSE;
+}
 
-	int x = (::GetSystemMetrics(SM_CXSCREEN) - width) >> 1;
-	int y = (::GetSystemMetrics(SM_CYSCREEN) - height) >> 1;
-
-	marshal_context ctx{};
-	pin_ptr<const wchar_t> native_title = ctx.marshal_as<const wchar_t*>(title);
+bool CSW::Window::CreateNativeWindow(String^ title, SIZE size, POINT pos)
+{
+	pin_ptr<const wchar_t> native_title = PtrToStringChars(title);
 	window = CreateWindowExW(
 		NULL,
-		windowClass.lpszClassName,
+		CSW_REGISTER_CLASS_NAME,
 		native_title,
 		WS_OVERLAPPEDWINDOW,
-		x, y,
-		windowWidth, windowHeight,
+		pos.x, pos.y,
+		size.cx, size.cy,
 		NULL,
 		NULL,
 		instance,
 		NULL
 	);
+
+	return window != NULL;
+}
+
+bool CalcWindowCenterPos(int width, int height, POINT* pos, SIZE* size)
+{
+	RECT windowRect{};
+	windowRect.left = 0;
+	windowRect.top = 0;
+	windowRect.right = width;
+	windowRect.bottom = height;
+	bool isAdjust = AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+	if (!isAdjust)
+	{
+		return false;
+	}
+
+	size->cx = windowRect.right - windowRect.left;
+	size->cy = windowRect.bottom - windowRect.top;
+	pos->x = (::GetSystemMetrics(SM_CXSCREEN) - size->cx) >> 1;
+	pos->y = (::GetSystemMetrics(SM_CYSCREEN) - size->cy) >> 1;
+	return true;
+}
+
+CSW::Window::Window(String^ title, int width, int height)
+	: window(NULL), instance(GetModuleHandleW(NULL)),
+	updateFuncs(gcnew List<Action^>(0))
+{
+	GlobalKey::Initialize();
+
+
+	if (SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+	{
+		throw gcnew System::InvalidOperationException(
+			"SetProcessDpiAwarenessContextで無効なパラメーターが指定されました Err:" + ::GetLastError()
+		);
+	}
+
+	if (!RegisterWindowClass())
+	{
+		throw gcnew System::InvalidOperationException(
+			"RegisterWindowClassでウィンドウクラスの登録に失敗しました Err:" + ::GetLastError()
+		);
+	}
+
+	POINT windowPos{};
+	SIZE windowSize{};
+	if (!CalcWindowCenterPos(width, height, &windowPos, &windowSize))
+	{
+		throw gcnew System::InvalidOperationException(
+			"CalcWindowCenterPosで座標の計算に失敗しました Err:" + ::GetLastError()
+		);
+	}
+
+
+	if (!CreateNativeWindow(title, windowSize, windowPos))
+	{
+		throw gcnew System::InvalidOperationException(
+			"CreateNativeWindowでウィンドウの作成に失敗しました Err:" + ::GetLastError()
+		);
+	}
 }
 
 CSW::Window::~Window()
@@ -104,6 +155,13 @@ CSW::Window::~Window()
 
 CSW::Window::!Window()
 {
+	if (window)
+	{
+		DestroyWindow(window);
+		window = nullptr;
+	}
+
+	UnregisterWindowClass();
 }
 
 void CSW::Window::AddUpdateFunc(Action^ function)
@@ -113,18 +171,14 @@ void CSW::Window::AddUpdateFunc(Action^ function)
 
 void CSW::Window::Show()
 {
-	::ShowWindow(window, SW_SHOW);
+	if (window)
+	{
+		::ShowWindow(window, SW_SHOW);
+	}
 }
 
 bool CSW::Window::Update()
 {
-	for (int i = 0; i < updateFuncs->Count; i++)
-	{
-		updateFuncs[i]();
-	}
-
-	GlobalKey::CopyPrevious();
-
 	MSG msg{};
 	while (::PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
 	{
@@ -135,12 +189,20 @@ bool CSW::Window::Update()
 		::TranslateMessage(&msg);
 		::DispatchMessageW(&msg);
 	}
+
+	GlobalKey::CopyPrevious();
+
+	for (int i = 0; i < updateFuncs->Count; i++)
+	{
+		updateFuncs[i]();
+	}
+
 	return true;
 }
 
 void CSW::Window::UpdatePos(int x, int y)
 {
-
+	throw gcnew System::NotImplementedException("UpdatePos関数はまだ実装されていません");
 }
 
 bool CSW::Window::KeyDown(Key key)

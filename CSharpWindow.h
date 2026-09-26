@@ -1,21 +1,19 @@
 ﻿#pragma once
-#include<iostream>
 #include<windows.h>
-#include<msclr/marshal.h>
-using msclr::interop::marshal_context;
+#include<vcclr.h>
 
 #using<System.dll>
 #using<System.Core.dll>
 #using<System.Drawing.dll>
-//#using
 using System::String;
 using System::Action;
 using System::IntPtr;
-using System::Drawing::Color;
 using System::Collections::Generic::List;
 using System::Collections::Generic::HashSet;
 
-#define CSW_RAWINPUT_DEVICE_INDEX_KEYBOARD (0)
+const wchar_t* CSW_REGISTER_CLASS_NAME = L"CSharpWindow v(^_^)";
+constexpr size_t CSW_RAWINPUT_DEVICE_INDEX_KEYBOARD = 0;
+
 
 namespace CSW
 {
@@ -169,6 +167,7 @@ namespace CSW
 		//ここから先は不要っぽいので書きません
 	};
 
+	/// @brief 基本的に一つのウィンドウで使う
 	private ref class GlobalKey
 	{
 	private:
@@ -176,41 +175,76 @@ namespace CSW
 		static HashSet<Key>^ prevKeys;
 
 	public:
-		static void Create()
+		static void Initialize()
 		{
-			downKeys = gcnew HashSet<Key>();
-			prevKeys = gcnew HashSet<Key>();
+			if(!downKeys) downKeys = gcnew HashSet<Key>();
+			downKeys->Clear();
+
+			if(!prevKeys) prevKeys = gcnew HashSet<Key>();
+			prevKeys->Clear();
 		}
 
 		static void AddKey(Key key)
 		{
+			if (!downKeys)
+			{
+				Initialize();
+			}
 			downKeys->Add(key);
 		}
 
 		static void RemoveKey(Key key)
 		{
+			if (!downKeys)
+			{
+				Initialize();
+			}
 			downKeys->Remove(key);
 		}
 
 		static bool Contains(Key key)
 		{
+			if (!downKeys)
+			{
+				Initialize();
+			}
 			return downKeys->Contains(key);
 		}
 
 		static bool ContainsPrevious(Key key)
 		{
+			if (!prevKeys)
+			{
+				Initialize();
+			}
+
 			return prevKeys->Contains(key);
 		}
 
 		static void CopyPrevious()
 		{
+			if (!downKeys || !prevKeys)
+			{
+				Initialize();
+			}
+
 			prevKeys = gcnew HashSet<Key>(downKeys);
 		}
 
 		static void ClearAllKeys()
 		{
-			delete downKeys;
-			delete prevKeys;
+			if (downKeys)
+			{
+				downKeys->Clear();
+				delete downKeys;
+				downKeys = nullptr;
+			}
+			if (prevKeys)
+			{
+				prevKeys->Clear();
+				delete prevKeys;
+				prevKeys = nullptr;
+			}
 		}
 	};
 
@@ -221,10 +255,12 @@ namespace CSW
 	private:
 		HINSTANCE instance;
 		HWND window;
-		COLORREF backColor;
-
 		List<Action^>^ updateFuncs;
-		int globalKeysIndex;
+
+	private:
+		bool RegisterWindowClass();
+		bool UnregisterWindowClass();
+		bool CreateNativeWindow(String^ title, SIZE size, POINT pos);
 
 	public:
 		Window(String^ title, int width, int height);
